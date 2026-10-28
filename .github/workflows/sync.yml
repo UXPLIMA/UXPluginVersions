@@ -1,0 +1,40 @@
+name: sync
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: sync
+        run: |
+          {
+            echo "changed<<EOF"
+            python3 .github/sync_versions.py
+            echo "EOF"
+          } >>"$GITHUB_OUTPUT"
+      - if: steps.sync.outputs.changed != ''
+        env:
+          CHANGED: ${{ steps.sync.outputs.changed }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- . ':!.github'
+          git commit -m "$(printf '%s\n' "$CHANGED" | paste -sd ', ')"
+          git push
